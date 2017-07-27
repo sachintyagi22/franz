@@ -1,15 +1,15 @@
 package com.kifi.franz
 
-import com.amazonaws.auth.{AWSCredentialsProvider, AWSCredentials}
-import com.amazonaws.regions.{Regions, Region}
+import com.amazonaws.auth.{AWSCredentials, AWSCredentialsProvider}
+import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.sqs.AmazonSQSAsyncClient
 import com.amazonaws.services.sqs.buffered.AmazonSQSBufferedAsyncClient
-import com.amazonaws.services.sqs.model.{DeleteQueueRequest, GetQueueUrlRequest, GetQueueUrlResult, QueueDoesNotExistException, ListQueuesRequest, ListQueuesResult}
+import com.amazonaws.services.sqs.model._
 import com.amazonaws.handlers.AsyncHandler
+import play.api.libs.json.{Format, JsValue}
 
-import play.api.libs.json.{JsValue, Format}
-import scala.concurrent.{Future, Promise, ExecutionContext}
-import scala.util.{Success, Failure}
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.{Failure, Success}
 import scala.collection.JavaConversions._
 
 class SimpleSQSClient(credentialProvider: AWSCredentialsProvider, region: Regions, buffered: Boolean) extends SQSClient {
@@ -19,16 +19,16 @@ class SimpleSQSClient(credentialProvider: AWSCredentialsProvider, region: Region
   sqs.setRegion(Region.getRegion(region))
 
 
-  def simple(queue: QueueName, createIfNotExists: Boolean=false): SQSQueue[String] = {
+  def simple(queue: QueueName, createIfNotExists: Boolean = false): SQSQueue[String] = {
     new SimpleSQSQueue(sqs, queue, createIfNotExists)
   }
 
-  def json(queue: QueueName, createIfNotExists: Boolean=false): SQSQueue[JsValue] = {
+  def json(queue: QueueName, createIfNotExists: Boolean = false): SQSQueue[JsValue] = {
     new JsonSQSQueue(sqs, queue, createIfNotExists)
   }
 
 
-  def formatted[T](queue: QueueName, createIfNotExists: Boolean=false)(implicit format: Format[T]): SQSQueue[T] = {
+  def formatted[T](queue: QueueName, createIfNotExists: Boolean = false)(implicit format: Format[T]): SQSQueue[T] = {
     new FormattedSQSQueue(sqs, queue, createIfNotExists, format)
   }
 
@@ -39,6 +39,7 @@ class SimpleSQSClient(credentialProvider: AWSCredentialsProvider, region: Region
         case _: QueueDoesNotExistException => queueDidExist.success(false)
         case _ => queueDidExist.failure(exception)
       }
+
       def onSuccess(req: GetQueueUrlRequest, response: GetQueueUrlResult) = {
         val queueUrl = response.getQueueUrl()
         queueDidExist.completeWith(deleteQueueByUrl(queueUrl))
@@ -51,11 +52,12 @@ class SimpleSQSClient(credentialProvider: AWSCredentialsProvider, region: Region
     val deletedQueues = Promise[Int]
     sqs.listQueuesAsync(new ListQueuesRequest(queuePrefix), new AsyncHandler[ListQueuesRequest, ListQueuesResult] {
       def onError(exception: Exception) = deletedQueues.failure(exception)
+
       def onSuccess(req: ListQueuesRequest, response: ListQueuesResult) = {
         val queueUrls = response.getQueueUrls()
         Future.sequence(queueUrls.map(deleteQueueByUrl)) onComplete {
-            case Failure(exception) => deletedQueues.failure(exception)
-            case Success(confirmations) => deletedQueues.success(confirmations.length)
+          case Failure(exception) => deletedQueues.failure(exception)
+          case Success(confirmations) => deletedQueues.success(confirmations.length)
         }
       }
     })
@@ -64,14 +66,18 @@ class SimpleSQSClient(credentialProvider: AWSCredentialsProvider, region: Region
 
   private def deleteQueueByUrl(queueUrl: String): Future[Boolean] = {
     val deletedQueue = Promise[Boolean]
-    sqs.deleteQueueAsync(new DeleteQueueRequest(queueUrl), new AsyncHandler[DeleteQueueRequest, Void] {
-      def onError(exception: Exception) = deletedQueue.failure(exception)
-      def onSuccess(req: DeleteQueueRequest, response: Void) = deletedQueue.success(true)
-    })
+    val delQueueReq = new DeleteQueueRequest(queueUrl)
+    val asyncHandler = new AsyncHandler[DeleteQueueRequest, DeleteQueueResult] {
+      override def onError(exception: Exception): Unit = deletedQueue.failure(exception)
+
+      override def onSuccess(request: DeleteQueueRequest, result: DeleteQueueResult): Unit =
+        deletedQueue.success(true)
+    }
+    sqs.deleteQueueAsync(delQueueReq, asyncHandler)
     deletedQueue.future
   }
 
-  def shutdown(): Unit ={
+  def shutdown(): Unit = {
     this.sqs.shutdown()
   }
 
@@ -79,20 +85,22 @@ class SimpleSQSClient(credentialProvider: AWSCredentialsProvider, region: Region
 
 object SimpleSQSClient {
 
-  def apply(credentials: AWSCredentials, region: Regions, buffered: Boolean = false) : SQSClient = {
+  def apply(credentials: AWSCredentials, region: Regions, buffered: Boolean = false): SQSClient = {
     val credentialProvider = new AWSCredentialsProvider {
       def getCredentials() = credentials
+
       def refresh() = {}
     }
     new SimpleSQSClient(credentialProvider, region, buffered);
   }
 
-  def apply(key: String, secret: String, region: Regions) : SQSClient = {
+  def apply(key: String, secret: String, region: Regions): SQSClient = {
     val credentials = new AWSCredentials {
       def getAWSAccessKeyId() = key
+
       def getAWSSecretKey() = secret
     }
-    this(credentials, region, false)
+    this (credentials, region, false)
   }
 
 }
