@@ -21,6 +21,8 @@ libraryDependencies += "com.typesafe.play" %% "play-ws-standalone-json" % "1.0.0
 // libraryDependencies += "com.typesafe.play" %% "play-iteratees" % "2.3.7"
 libraryDependencies += "com.typesafe.play" % "play-iteratees_2.10" % "2.4.11"
 
+libraryDependencies += "com.amazonaws" % "amazon-sqs-java-extended-client-lib" % "1.0.1"
+
 publishMavenStyle := true
 
 publishTo := {

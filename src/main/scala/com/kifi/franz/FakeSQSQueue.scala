@@ -2,14 +2,14 @@ package com.kifi.franz
 
 import com.amazonaws.services.sqs.AmazonSQSAsync
 
-import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
 
 
-trait FakeSQSQueue[T] extends SQSQueue[T] {
+trait FakeSQSQueue[T] extends AsyncSQSQueue[T] {
 
-  protected val sqs: AmazonSQSAsync = null
+  val sqs: AmazonSQSAsync = null
   protected val createIfNotExists: Boolean = false
   val queue: QueueName = QueueName("fake")
   protected implicit def asString(obj: T): String = null
@@ -19,7 +19,7 @@ trait FakeSQSQueue[T] extends SQSQueue[T] {
 
   override def send(msg: T, messageAttributes: Option[Map[String,String]], delay: Option[Int] = None): Future[MessageId] = Future.successful(MessageId(""))
 
-  override protected def nextBatchRequestWithLock(maxBatchSize: Int, lockTimeout: FiniteDuration, waitTimeout: FiniteDuration): Future[Seq[SQSMessage[T]]] =
+  override def nextBatchRequestWithLock(maxBatchSize: Int, lockTimeout: FiniteDuration, waitTimeout: FiniteDuration): Future[Seq[SQSMessage[T]]] =
     Future.successful(Seq.empty)
 
 }
