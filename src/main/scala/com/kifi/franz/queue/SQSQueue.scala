@@ -1,4 +1,4 @@
-package com.kifi.franz
+package com.kifi.franz.queue
 
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model._
@@ -9,35 +9,13 @@ import scala.concurrent.duration.{FiniteDuration, SECONDS}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.implicitConversions
 
-case class QueueName(name: String)
-
-case class MessageId(id: String)
-
-case class SQSMessage[T](id: MessageId,
-                         body: T,
-                         consume: () => Unit,
-                         setVisibilityTimeout: (FiniteDuration) => Unit,
-                         attributes: Map[String, String],
-                         messageAttributes: Map[String, MessageAttributeValue]) {
-
-  def consume[K](block: T => K): K = {
-    val returnValue = block(body)
-    consume()
-    returnValue
-  }
-}
-
-object SQSQueue {
-  val DefaultWaitTimeout = FiniteDuration(10, SECONDS)
-}
-
-trait SQSQueue[T] {
+trait SQSQueue[T, +Q <: AmazonSQS] {
 
   import SQSQueue.DefaultWaitTimeout
 
   val queue: QueueName
 
-  protected def sqs: AmazonSQS
+  protected def sqs: Q
 
   protected val createIfNotExists: Boolean
 
@@ -219,3 +197,26 @@ trait SQSQueue[T] {
   }
 
 }
+
+case class QueueName(name: String)
+
+case class MessageId(id: String)
+
+case class SQSMessage[T](id: MessageId,
+                         body: T,
+                         consume: () => Unit,
+                         setVisibilityTimeout: (FiniteDuration) => Unit,
+                         attributes: Map[String, String],
+                         messageAttributes: Map[String, MessageAttributeValue]) {
+
+  def consume[K](block: T => K): K = {
+    val returnValue = block(body)
+    consume()
+    returnValue
+  }
+}
+
+object SQSQueue {
+  val DefaultWaitTimeout = FiniteDuration(10, SECONDS)
+}
+

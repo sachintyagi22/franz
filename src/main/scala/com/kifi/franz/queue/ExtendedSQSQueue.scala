@@ -1,4 +1,4 @@
-package com.kifi.franz
+package com.kifi.franz.queue
 
 import com.amazon.sqs.javamessaging.AmazonSQSExtendedClient
 import com.amazonaws.services.sqs.model._
@@ -11,7 +11,7 @@ import scala.concurrent.{Future, blocking}
 /**
   * Created by sachint on 28/7/17.
   */
-abstract class ExtendedSQSQueue[T] extends SQSQueue[T] {
+trait ExtendedSQSQueue[T] extends SQSQueue[T, AmazonSQSExtendedClient] {
 
   override protected def sqs: AmazonSQSExtendedClient
 

@@ -1,4 +1,4 @@
-package com.kifi.franz
+package com.kifi.franz.queue
 
 import com.amazonaws.handlers.AsyncHandler
 import com.amazonaws.services.sqs.AmazonSQSAsync
@@ -9,7 +9,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 import scala.language.implicitConversions
 
-abstract class AsyncSQSQueue[T] extends SQSQueue[T] {
+trait AsyncSQSQueue[T] extends SQSQueue[T, AmazonSQSAsync] {
 
   override def sqs: AmazonSQSAsync
 
@@ -95,4 +95,37 @@ abstract class AsyncSQSQueue[T] extends SQSQueue[T] {
   }
 
 }
+
+trait FakeSQSQueue[T] extends AsyncSQSQueue[T] {
+
+  val sqs: AmazonSQSAsync = null
+  protected val createIfNotExists: Boolean = false
+  val queue: QueueName = QueueName("fake")
+
+  protected implicit def asString(obj: T): String = null
+
+  protected implicit def fromString(s: String): T = null.asInstanceOf[T]
+
+  override def initQueueUrl(): String = ""
+
+  override def send(msg: T, messageAttributes: Option[Map[String, String]], delay: Option[Int] = None): Future[MessageId] = Future.successful(MessageId(""))
+
+  override def nextBatchRequestWithLock(maxBatchSize: Int, lockTimeout: FiniteDuration, waitTimeout: FiniteDuration): Future[Seq[SQSMessage[T]]] =
+    Future.successful(Seq.empty)
+
+}
+
+
+class ByteArraySQSQueue(val sqs: AmazonSQSAsync,
+                        val queue: QueueName,
+                        protected val createIfNotExists: Boolean = false) extends AsyncSQSQueue[Array[Byte]] {
+
+  private lazy val base64Encoder = java.util.Base64.getEncoder
+  private lazy val base64Decoder = java.util.Base64.getDecoder
+
+  protected implicit def asString(data: Array[Byte]): String = new String(base64Encoder.encode(data))
+
+  protected implicit def fromString(data: String): Array[Byte] = base64Decoder.decode(data)
+}
+
 
